@@ -1,0 +1,32 @@
+# Parameters for yolo_seg_node.py (node name: yolo_seg)
+#
+# Subscribes /sync/{top,left_wrist,right_wrist,front}/image_raw (hardcoded in
+# the node) and publishes /{cam}/YOLO_mask.
+
+yolo_seg:
+  ros__parameters:
+    # TODO: set to your converted OpenVINO IR dir (or a .pt file for testing):
+    #   python3 scripts/convert_to_openvino.py yolo --pt models/best_XXXX.pt --imgsz 320
+    model: "/home/felix/projects/Segmentation-Guided-Grasping/act_yolo_grasp/models/best_openvino_model"
+
+    # intel:gpu (Arc, default) | intel:npu | intel:cpu | cpu
+    device: "intel:gpu"
+
+    conf_threshold: 0.6
+    input_width: 320
+    input_height: 240
+
+    # task-completion detection
+    enable_action_done: true
+    action_done_topic: "/action_done"
+    done_overlap_ratio_thres: 0.05
+    done_confirm_frames: 50
+    done_cooldown_sec: 8.0
+
+    # water-grasp detection (left_wrist camera + gripper feedback)
+    motor_feedback_topic: "/motor_angle_feedback_topic"
+    task_status_set_topic: "/task_status_set"
+    water_grasp_area_thres: 0.1
+    water_grasp_gripper_thres: 0.5
+    water_grasp_confirm_frames: 30
+    water_grasp_fail_frames: 30

@@ -1,0 +1,9 @@
+numpy>=2.3.5
+opencv-python>=4.8.1.78
+ultralytics>=8.4.90
+openvino>=2026.1.0
+torch>=2.12.1
+torchvision>=0.27.1
+onnx>=1.22.0
+onnxruntime>=1.27.0
+packaging>=23.0

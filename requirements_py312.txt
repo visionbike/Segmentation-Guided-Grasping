@@ -1,0 +1,12 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+numpy>=1.26,<2.0
+opencv-python>=4.8.1.78,<5.0
+ultralytics>=8.4.90
+openvino>=2026.2.1
+torch>=2.12.1
+torchvision>=0.27.1
+onnx>=1.22.0
+onnxruntime>=1.27.0
+pyserial>=3.5
+packaging>=23.0

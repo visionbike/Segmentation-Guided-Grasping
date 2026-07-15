@@ -1,0 +1,54 @@
+# ============================================
+# Model weights & converted artifacts
+# (too large for git — transfer via scp/drive)
+# ============================================
+act_yolo_grasp/models/
+*.pt
+*.ckpt
+*.onnx
+*.bin
+*.engine
+*_openvino_model/
+dataset_stats.pkl
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.venv/
+.venv/
+
+# ============================================
+# ROS 2 / colcon
+# (in case someone builds inside the repo)
+# ============================================
+install/
+log/
+.colcon/
+
+# ============================================
+# ROS 2 / colcon
+# (in case someone builds inside the repo)
+# ============================================
+install/
+log/
+.colcon/
+
+# ============================================
+# Runtime output from the nodes
+# ============================================
+*.csv          # action/observation/metric logs from act_policy_node
+*.hdf5
+
+# ============================================
+# IDE / editor / OS
+# ============================================
+.vscode/
+.idea/
+*.swp
+.DS_Store
