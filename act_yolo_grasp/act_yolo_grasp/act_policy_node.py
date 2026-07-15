@@ -1,5 +1,6 @@
 import os
 import csv
+import glob
 import time
 import pickle
 import threading
@@ -592,9 +593,18 @@ class ACTPolicyInferenceNode(Node):
     def load_openvino_policy(self):
         import openvino as ov
 
-        xml_path = self.ov_model_path or os.path.join(
-            self.ckpt_dir, os.path.splitext(self.ckpt_name)[0] + ".xml"
+        # default: <ckpt_dir>/<ckpt stem>_openvino_model/ (folder layout, like YOLO)
+        model_path = self.ov_model_path or os.path.join(
+            self.ckpt_dir, os.path.splitext(self.ckpt_name)[0] + "_openvino_model"
         )
+        # accept either an IR folder (glob the .xml inside) or a direct .xml file
+        if os.path.isdir(model_path):
+            xmls = sorted(glob.glob(os.path.join(model_path, "*.xml")))
+            if not xmls:
+                raise FileNotFoundError(f"No .xml found in OpenVINO IR folder: {model_path}")
+            xml_path = xmls[0]
+        else:
+            xml_path = model_path if model_path.endswith(".xml") else model_path + ".xml"
         if not os.path.exists(xml_path):
             raise FileNotFoundError(f"OpenVINO IR not found: {xml_path}")
 

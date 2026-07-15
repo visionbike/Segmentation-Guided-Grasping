@@ -32,9 +32,8 @@ setup(
         "yolo_seg = act_yolo_grasp.yolo_seg_node:main",
         "act_policy = act_yolo_grasp.act_policy_node:main",
         "visualize_image = act_yolo_grasp.visualize_node:main",
-        # Enable if the U2D2 motor serial link runs on this machine
-        # (copy packet_processor_{send,receive}.py from the IL package first):
-        # "packet_processor_send = act_yolo_grasp.packet_processor_send:main",
-        # "packet_processor_receive = act_yolo_grasp.packet_processor_receive:main",
+        # U2D2 motor serial link (run only where the serial device is present)
+        "packet_processor_send = act_yolo_grasp.packet_processor_send_node:main",
+        "packet_processor_receive = act_yolo_grasp.packet_processor_receive_node:main",
     ]},
 )

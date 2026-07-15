@@ -7,7 +7,7 @@ act_policy_inference_node:
   ros__parameters:
     # ---------- inference backend ----------
     backend: "openvino"        # openvino | onnx | torch
-    ov_device: "GPU"           # GPU | NPU | CPU | AUTO
+    ov_device: "NPU"           # GPU | NPU | CPU | AUTO
     device: "cpu"              # torch device (ensembling math only on deploy)
 
     # TODO: dir containing policy_best.xml/.bin (+ dataset_stats.pkl, REQUIRED)

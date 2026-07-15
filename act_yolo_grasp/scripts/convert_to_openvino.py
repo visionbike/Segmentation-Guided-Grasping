@@ -1,17 +1,21 @@
 """Convert models to OpenVINO IR (FP16) for the Intel AI PC (Arc GPU / NPU).
 
-  YOLO:  ultralytics .pt  -> <name>_openvino_model/  (IR FP16, dynamic batch)
-  ACT :  .onnx -> <name>.xml/.bin  (IR FP16)
+  YOLO:  ultralytics .pt   -> <name>_openvino_model/  (IR FP16, dynamic batch)
+         ultralytics .onnx -> <name>_openvino_model/  (IR FP16 + metadata.yaml
+         rebuilt from the ONNX so ultralytics recovers class names / task)
+  ACT :  .onnx -> <name>_openvino_model/  (IR FP16 + metadata.yaml)
          a .ckpt is also accepted: it is exported to ONNX first via
          scripts/export_act_onnx.py (CPU is sufficient).
 
 Examples (from the package root):
-    python3 scripts/convert_to_openvino.py yolo --pt models/best_0613.pt --imgsz 320
+    python3 scripts/convert_to_openvino.py yolo --pt   models/best_0613.pt --imgsz 320
+    python3 scripts/convert_to_openvino.py yolo --onnx models/best_0613_fp32.onnx
     python3 scripts/convert_to_openvino.py act  --onnx models/policy_best.onnx --verify
     python3 scripts/convert_to_openvino.py act  --ckpt_dir models --verify --verify_device GPU
 """
 
 import argparse
+import ast
 import os
 import subprocess
 import sys
@@ -35,16 +39,102 @@ def convert_yolo(pt_path, imgsz, half=True):
     return str(out_dir)
 
 
-def convert_act_onnx_to_ir(onnx_path, output=None):
-    import openvino as ov
+def convert_yolo_from_onnx(onnx_path, half=True):
+    """ultralytics YOLO .onnx -> <name>_openvino_model/ (IR FP16 + metadata.yaml).
 
-    output = output or os.path.splitext(onnx_path)[0] + ".xml"
+    ov.convert_model alone produces a bare .xml/.bin with no metadata, and
+    ultralytics' YOLO() loader then falls back to numeric class names, which
+    breaks yolo_seg_node's `cls_name == "basket"` logic. The class names /
+    task / stride / imgsz are embedded in the ONNX metadata_props (ultralytics
+    exports them there), so we rebuild metadata.yaml from those.
+    """
+    import onnx
+    import openvino as ov
+    import yaml
+
+    stem = os.path.splitext(os.path.basename(onnx_path))[0]
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(onnx_path)),
+                           f"{stem}_openvino_model")
+    os.makedirs(out_dir, exist_ok=True)
+    xml_path = os.path.join(out_dir, f"{stem}.xml")
+
+    model = ov.convert_model(onnx_path)
+    ov.save_model(model, xml_path, compress_to_fp16=half)
+
+    props = {p.key: p.value for p in onnx.load(onnx_path, load_external_data=False).metadata_props}
+    if "names" not in props:
+        raise ValueError(
+            f"{onnx_path} has no embedded 'names' metadata - it was not exported "
+            f"by ultralytics. Re-export from the .pt with format='onnx', or use --pt."
+        )
+    metadata = {
+        "description": props.get("description", ""),
+        "author": props.get("author", "Ultralytics"),
+        "date": props.get("date", ""),
+        "version": props.get("version", ""),
+        "license": props.get("license", ""),
+        "docs": props.get("docs", ""),
+        "stride": int(props.get("stride", 32)),
+        "task": props.get("task", "segment"),
+        "batch": int(props.get("batch", 1)),
+        "imgsz": ast.literal_eval(props["imgsz"]),   # e.g. "[320, 320]"
+        "names": ast.literal_eval(props["names"]),   # e.g. "{0: 'basket', ...}"
+    }
+    with open(os.path.join(out_dir, "metadata.yaml"), "w", encoding="utf-8") as f:
+        yaml.safe_dump(metadata, f, sort_keys=False, allow_unicode=True)
+
+    print(f"[OK] YOLO OpenVINO IR: {out_dir}  ({len(metadata['names'])} classes)")
+    return out_dir
+
+
+def convert_act_onnx_to_ir(onnx_path, output_dir=None):
+    """ACT .onnx -> <name>_openvino_model/ (IR FP16 + metadata.yaml).
+
+    Mirrors the YOLO layout: a self-contained folder with <name>.xml, <name>.bin
+    and metadata.yaml. metadata.yaml documents the shape contract read from the
+    ONNX (camera_names are not encoded in the graph, only num_cam). Returns the
+    .xml path inside the folder.
+    """
+    import onnx
+    import openvino as ov
+    import yaml
+
+    stem = os.path.splitext(os.path.basename(onnx_path))[0]
+    out_dir = output_dir or os.path.join(
+        os.path.dirname(os.path.abspath(onnx_path)), f"{stem}_openvino_model")
+    os.makedirs(out_dir, exist_ok=True)
+    xml_path = os.path.join(out_dir, f"{stem}.xml")
+
     model = ov.convert_model(onnx_path)
     # compress_to_fp16=True stores weights as f16; execution precision is
     # chosen per device at compile time.
-    ov.save_model(model, output, compress_to_fp16=True)
-    print(f"[OK] ACT OpenVINO IR: {output} (+ .bin)")
-    return output
+    ov.save_model(model, xml_path, compress_to_fp16=True)
+
+    def _shape(io):
+        return [d.dim_value if d.dim_value else d.dim_param
+                for d in io.type.tensor_type.shape.dim]
+
+    g = onnx.load(onnx_path, load_external_data=False).graph
+    inp = {i.name: _shape(i) for i in g.input}
+    out = {o.name: _shape(o) for o in g.output}
+    qpos, image, action = inp.get("qpos", []), inp.get("image", []), out.get("action", [])
+    metadata = {
+        "task": "act_policy",
+        "precision": "FP16",
+        "static_batch": bool(qpos) and all(isinstance(d, int) for d in qpos),
+        "obs_dim": qpos[-1] if qpos else None,
+        "num_cam": image[1] if len(image) >= 2 else None,
+        "image_height": image[-2] if len(image) >= 2 else None,
+        "image_width": image[-1] if len(image) >= 1 else None,
+        "chunk_size": action[1] if len(action) >= 2 else None,
+        "action_dim": action[-1] if action else None,
+        "note": "camera_names come from the ROS param; only num_cam is encoded in the graph",
+    }
+    with open(os.path.join(out_dir, "metadata.yaml"), "w", encoding="utf-8") as f:
+        yaml.safe_dump(metadata, f, sort_keys=False)
+
+    print(f"[OK] ACT OpenVINO IR: {out_dir}")
+    return xml_path
 
 
 def export_act_ckpt_to_onnx(ckpt_dir, ckpt_name, extra_args):
@@ -88,15 +178,17 @@ def main():
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_yolo = sub.add_parser("yolo", help="ultralytics .pt -> OpenVINO IR dir")
-    p_yolo.add_argument("--pt", required=True, help="path to the YOLO .pt weights")
-    p_yolo.add_argument("--imgsz", type=int, default=320)
+    p_yolo = sub.add_parser("yolo", help="ultralytics .pt or .onnx -> OpenVINO IR dir")
+    g_yolo = p_yolo.add_mutually_exclusive_group(required=True)
+    g_yolo.add_argument("--pt", help="path to the YOLO .pt weights")
+    g_yolo.add_argument("--onnx", help="path to an ultralytics-exported YOLO .onnx")
+    p_yolo.add_argument("--imgsz", type=int, default=320, help="only used with --pt")
 
     p_act = sub.add_parser("act", help="ACT .onnx (or .ckpt) -> OpenVINO IR")
     p_act.add_argument("--onnx", help="existing ONNX (recommended input)")
     p_act.add_argument("--ckpt_dir", help="fallback: export ONNX from this checkpoint dir first")
     p_act.add_argument("--ckpt_name", default="policy_best.ckpt")
-    p_act.add_argument("--output", help="output .xml path (default: alongside the ONNX)")
+    p_act.add_argument("--output", help="output IR folder (default: <onnx_stem>_openvino_model/ beside the ONNX)")
     p_act.add_argument("--verify", action="store_true")
     p_act.add_argument("--verify_device", default="CPU", help="CPU | GPU | NPU")
     p_act.add_argument("--ncam", type=int, default=3)
@@ -107,7 +199,10 @@ def main():
     args, extra = parser.parse_known_args()
 
     if args.cmd == "yolo":
-        convert_yolo(args.pt, args.imgsz)
+        if args.pt:
+            convert_yolo(args.pt, args.imgsz)
+        else:
+            convert_yolo_from_onnx(args.onnx)
         return
 
     onnx_path = args.onnx

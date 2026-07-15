@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 """Export an ACTPolicy checkpoint (act_yolo_grasp.act) to ONNX.
 
 Reproduces exactly the inference contract used by act_policy_node.py:
@@ -23,6 +22,11 @@ Example (from the package root):
     python3 scripts/export_act_onnx.py \\
         --ckpt_dir models --ckpt_name policy_best.ckpt \\
         --camera_names top left_wrist right_wrist --chunk_size 10
+
+    # fixed batch=1 graph for GPU/NPU (matches the node's runtime reshape):
+    python3 scripts/export_act_onnx.py \\
+        --ckpt_dir models --ckpt_name policy_best.ckpt \\
+        --camera_names top left_wrist right_wrist --static-batch
 """
 
 import argparse
@@ -87,7 +91,10 @@ def parse_args():
 
     p.add_argument("--opset", type=int, default=17)
     p.add_argument("--batch_size", type=int, default=1,
-                   help="Batch size used for the dummy export trace")
+                   help="Batch size for the dummy export trace (forced to 1 with --static-batch)")
+    p.add_argument("--static-batch", dest="static_batch", action="store_true",
+                   help="Export a fixed batch=1 graph (no dynamic axes). The runtime "
+                        "is always batch=1, so this makes the IR inherently GPU/NPU-static.")
     p.add_argument("--atol", type=float, default=1e-4)
     p.add_argument("--rtol", type=float, default=1e-3)
     return p.parse_args()
@@ -149,6 +156,8 @@ def sanity_check_stats(args):
 
 def export(args):
     sanity_check_stats(args)
+    if args.static_batch:
+        args.batch_size = 1  # a fixed-shape graph is only valid at batch=1
     policy = build_policy(args)
     device = next(policy.parameters()).device
     # label from declared attrs (.type / .index): torch's stubs declare no
@@ -177,18 +186,23 @@ def export(args):
         output_path = Path(args.ckpt_dir) / (Path(args.ckpt_name).stem + ".onnx")
     output_path.resolve().parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"[INFO] Exporting to {output_path} (opset={args.opset}) ...")
+    # Static batch=1 (no dynamic axes) vs dynamic batch axis. The ACT node
+    # always infers batch=1 and reshapes the IR to [1, ...] at load, so static
+    # matches runtime exactly and yields an inherently GPU/NPU-static IR.
+    dynamic_axes = None if args.static_batch else {
+        "qpos": {0: "batch"},
+        "image": {0: "batch"},
+        "action": {0: "batch"},
+    }
+    mode = "static batch=1" if args.static_batch else "dynamic batch"
+    print(f"[INFO] Exporting to {output_path} (opset={args.opset}, {mode}) ...")
     torch.onnx.export(
         wrapper,
         (dummy_qpos, dummy_image),
         output_path,
         input_names=["qpos", "image"],
         output_names=["action"],
-        dynamic_axes={
-            "qpos": {0: "batch"},
-            "image": {0: "batch"},
-            "action": {0: "batch"},
-        },
+        dynamic_axes=dynamic_axes,
         opset_version=args.opset,
         do_constant_folding=True,
         # ACTPolicy overrides __call__ (not forward), which the torch>=2.9
@@ -227,9 +241,10 @@ def verify(args, wrapper, output_path, device):
     max_abs_diff = 0.0
     max_rel_diff = 0.0
     rel_diff_floor = 1e-2  # ignore near-zero outputs when computing relative error
-    n_trials = 3
+    # a static graph only accepts batch=1; a dynamic one also gets batch 2/3 tested
+    n_trials = 1 if args.static_batch else 3
     for trial in range(n_trials):
-        batch = max(1, args.batch_size + trial)  # also exercise the dynamic batch axis
+        batch = 1 if args.static_batch else max(1, args.batch_size + trial)
         qpos = torch.randn(batch, args.obs_dim)
         image = torch.rand(batch, num_cam, 3, args.image_height, args.image_width)
 
