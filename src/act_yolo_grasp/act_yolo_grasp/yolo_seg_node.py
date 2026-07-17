@@ -21,7 +21,7 @@ class YoloSegNode(Node):
 
         self.declare_parameter("model", "")  # .pt file or OpenVINO IR dir (e.g. .../best_0613_openvino_model)
         self.declare_parameter("device", "intel:gpu")  # intel:gpu | intel:npu | intel:cpu | cpu
-        self.declare_parameter("conf_threshold", 0.6)  # confidence threshold
+        self.declare_parameter("conf_threshold", 0.4)  # confidence threshold
         self.declare_parameter("input_width", 320)
         self.declare_parameter("input_height", 240)
 
@@ -142,40 +142,6 @@ class YoloSegNode(Node):
         self.action_done_pub = self.create_publisher(
             String,
             self.action_done_topic,
-            10
-        )
-
-        # ============================================================
-        # Water grasp detection → publish task_id=0 DONE to bridge
-        # ============================================================
-        self.declare_parameter("motor_feedback_topic", "/motor_angle_feedback_topic")
-        self.declare_parameter("task_status_set_topic", "/task_status_set")
-        self.declare_parameter("water_grasp_area_thres", 0.1)   # threshold for water mask area as fraction of the frame
-        self.declare_parameter("water_grasp_gripper_thres", 0.5) # L_Gripper closed threshold (tune to actual values)
-        self.declare_parameter("water_grasp_confirm_frames", 30)
-        self.declare_parameter("water_grasp_fail_frames", 30)    # fail threshold: gripper closed but no water detected
-
-        self.water_grasp_area_thres    = float(self.get_parameter("water_grasp_area_thres").value)
-        self.water_grasp_gripper_thres = float(self.get_parameter("water_grasp_gripper_thres").value)
-        self.water_grasp_confirm_frames = int(self.get_parameter("water_grasp_confirm_frames").value)
-        self.water_grasp_fail_frames   = int(self.get_parameter("water_grasp_fail_frames").value)
-
-        self.l_gripper_value           = 0.0
-        self.water_grasp_counter       = 0
-        self.water_grasp_fail_counter  = 0
-        self.water_task_done_published  = False
-        self.water_task_failed_published = False
-
-        self.task_status_set_pub = self.create_publisher(
-            Float32MultiArray,
-            self.get_parameter("task_status_set_topic").value,
-            10
-        )
-
-        self.create_subscription(
-            Float32MultiArray,
-            self.get_parameter("motor_feedback_topic").value,
-            self.motor_feedback_callback,
             10
         )
 
@@ -397,7 +363,7 @@ class YoloSegNode(Node):
 
 
         self.camera_params = {
-        # "top": {                      # D435
+        # "top": {                      # D455
             #     "K": np.array([
             #         [306.935, 0.0, 160.757],
             #         [0.0, 307.02, 124.195],
@@ -501,10 +467,6 @@ class YoloSegNode(Node):
                 self.locked_target_objects.clear()
                 self.non_target_color_override.clear()
                 self.done_published_for_current_state = False
-                self.water_task_done_published = False
-                self.water_task_failed_published = False
-                self.water_grasp_counter = 0
-                self.water_grasp_fail_counter = 0
                 for cam_name in self.done_confirm_counter:
                     self.done_confirm_counter[cam_name] = 0
                 self.get_logger().info(
@@ -543,10 +505,6 @@ class YoloSegNode(Node):
                     del self.non_target_color_override[new_target_cls]
 
             self.done_published_for_current_state = False
-            self.water_task_done_published = False
-            self.water_task_failed_published = False
-            self.water_grasp_counter = 0
-            self.water_grasp_fail_counter = 0
 
             for cam_name in self.done_confirm_counter:
                 self.done_confirm_counter[cam_name] = 0
@@ -1025,6 +983,7 @@ class YoloSegNode(Node):
         Decide the mask color from the current LLM state.
         This node publishes bgr8, so colors are BGR.
         """
+        
 
         # basket color:
         # whether the basket is displayed is NOT decided here;
@@ -1045,12 +1004,8 @@ class YoloSegNode(Node):
 
         # red cookies -> middle basket
         if self.active_state_name == "red_cookies_to_mid_basket":
-            # if cls_name == "lucky":
-            #     return self.COLOR_RED
-            # elif cls_name in ["cheetos", "tea"]:
-            #     return self.COLOR_GRAY
-            if cls_name == "water":
-                return self.COLOR_CYAN
+            if cls_name == "lucky":
+                return self.COLOR_RED
             elif cls_name in ["cheetos", "tea"]:
                 return self.COLOR_GRAY
 
@@ -1062,8 +1017,9 @@ class YoloSegNode(Node):
                 return self.COLOR_GRAY
 
         # green tea -> middle basket
+        # NOTE: the green-tea bottle is YOLO class "calpis" (class 2), not "tea" (class 11)
         elif self.active_state_name == "green_tea_to_mid_basket":
-            if cls_name == "tea":
+            if cls_name == "calpis":
                 return self.COLOR_GREEN
             elif cls_name in ["lucky", "cheetos"]:
                 return self.COLOR_GRAY
@@ -1240,79 +1196,6 @@ class YoloSegNode(Node):
         #     f"overlap_ratio={max_overlap_ratio:.2f}"
         # )
 
-    def motor_feedback_callback(self, msg: Float32MultiArray):
-        data = list(msg.data)
-        # format: [R1..R7, L1..L7, R_gripper, L_gripper, Neck]  (17 values)
-        if len(data) < 16:
-            return
-        self.l_gripper_value = float(data[15])
-
-    def check_and_publish_water_grasped(self, name, object_masks, total_pixels):
-        if name != "left_wrist":
-            return
-
-        if self.water_task_done_published or self.water_task_failed_published:
-            return
-
-        if self.active_state_name != "red_cookies_to_mid_basket":
-            return
-
-        # L_Gripper not closed -> reset both counters
-        if self.l_gripper_value < self.water_grasp_gripper_thres:
-            self.water_grasp_counter = 0
-            self.water_grasp_fail_counter = 0
-            return
-
-        # is the water mask area fraction in left_wrist above the threshold
-        water_found = False
-        for obj in object_masks:
-            if obj["cls_name"] != "water":
-                continue
-            area = int(np.count_nonzero(obj["mask"]))
-            ratio = area / float(total_pixels)
-            if ratio >= self.water_grasp_area_thres:
-                water_found = True
-                break
-
-        if water_found:
-            # success path: water detected
-            self.water_grasp_fail_counter = 0
-            self.water_grasp_counter += 1
-            self.get_logger().info(
-                f"[WATER GRASP] counter={self.water_grasp_counter}/{self.water_grasp_confirm_frames}, "
-                f"L_gripper={self.l_gripper_value:.3f}"
-            )
-
-            if self.water_grasp_counter < self.water_grasp_confirm_frames:
-                return
-
-            status_msg = Float32MultiArray()
-            status_msg.data = [0.0, 1.0]  # task_id=0, done=1
-            self.task_status_set_pub.publish(status_msg)
-            self.water_task_done_published = True
-            self.get_logger().info(
-                "[WATER GRASP] Task done! Published [0.0, 1.0] to /task_status_set"
-            )
-        else:
-            # failure path: gripper closed but no water detected
-            self.water_grasp_counter = 0
-            self.water_grasp_fail_counter += 1
-            self.get_logger().info(
-                f"[WATER GRASP FAIL] fail_counter={self.water_grasp_fail_counter}/{self.water_grasp_fail_frames}, "
-                f"L_gripper={self.l_gripper_value:.3f}"
-            )
-
-            if self.water_grasp_fail_counter < self.water_grasp_fail_frames:
-                return
-
-            status_msg = Float32MultiArray()
-            status_msg.data = [0.0, -1.0]  # task_id=0, failed=-1
-            self.task_status_set_pub.publish(status_msg)
-            self.water_task_failed_published = True
-            self.get_logger().info(
-                "[WATER GRASP FAIL] Task failed! Published [0.0, -1.0] to /task_status_set"
-            )
-
     def publish_color_mask(self, name, msg, img, result):
         h, w = img.shape[:2]
         color_mask = np.zeros((h, w, 3), dtype=np.uint8)
@@ -1485,12 +1368,6 @@ class YoloSegNode(Node):
             name=name,
             object_masks=object_masks,
             basket_cover_mask=basket_cover_mask
-        )
-
-        self.check_and_publish_water_grasped(
-            name=name,
-            object_masks=object_masks,
-            total_pixels=h * w
         )
 
         # =========================================================

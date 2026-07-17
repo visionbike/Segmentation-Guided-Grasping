@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Pure task/geometry logic for segmentation-guided grasping.
 
 ROS-free helpers extracted from yolo_seg_node.py so they can be unit-tested

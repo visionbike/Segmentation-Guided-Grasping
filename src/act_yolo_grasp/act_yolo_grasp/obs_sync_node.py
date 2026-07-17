@@ -19,7 +19,8 @@ class RawObservationSyncNode(Node):
 
         # list of cameras to synchronize; add as many as connected
         # e.g. ["top", "left_wrist", "right_wrist"] or add "front"
-        self.declare_parameter("camera_names", ["top", "left_wrist", "right_wrist", "front"])
+        # self.declare_parameter("camera_names", ["top", "left_wrist", "right_wrist", "front"])
+        self.declare_parameter("camera_names", ["top", "left_wrist", "right_wrist"])
 
         # input topic per camera
         self.declare_parameter("top_topic",   "/top/top_realsense_node/color/image_raw")
@@ -60,7 +61,7 @@ class RawObservationSyncNode(Node):
             "top":         str(self.get_parameter("sync_top_topic").value),
             "left_wrist":  str(self.get_parameter("sync_left_topic").value),
             "right_wrist": str(self.get_parameter("sync_right_topic").value),
-            "front":       str(self.get_parameter("sync_front_topic").value),
+            # "front":       str(self.get_parameter("sync_front_topic").value),
         }
 
         # --------------------------------------------------

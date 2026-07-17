@@ -11,9 +11,9 @@ act_policy_inference_node:
     device: "cpu"              # torch device (ensembling math only on deploy)
 
     # TODO: dir containing policy_best.xml/.bin (+ dataset_stats.pkl, REQUIRED)
-    ckpt_dir: "/home/felix/projects/Segmentation-Guided-Grasping/src/act_yolo_grasp/models"
+    ckpt_dir: "/home/asrlab-intel/projects/Segmentation-Guided-Grasping/src/act_yolo_grasp/models"
     ckpt_name: "policy_best.ckpt"   # stem also resolves .xml / .onnx defaults
-    ov_model_path: ""               # default: <ckpt_dir>/<ckpt stem>.xml
+    ov_model_path: "/home/asrlab-intel/projects/Segmentation-Guided-Grasping/src/act_yolo_grasp/models/policy_best_openvino_model/policy_best.xml"               # default: <ckpt_dir>/<ckpt stem>.xml
     onnx_path: ""                   # default: <ckpt_dir>/<ckpt stem>.onnx
     onnx_provider: "cpu"
 

@@ -9,9 +9,9 @@ raw_observation_sync_node:
     # 3-camera show pipeline (drop "front")
     camera_names: ["top", "left_wrist", "right_wrist"]
 
-    top_topic: "/top/top/color/image_raw"
-    left_topic: "/left_wrist/left_wrist/color/image_raw"
-    right_topic: "/right_wrist/right_wrist/color/image_raw"
+    top_topic: "/top/top_realsense_node/color/image_raw"
+    left_topic: "/left_wrist/left_wrist_realsense_node/color/image_raw"
+    right_topic: "/right_wrist/right_wrist_realsense_node/color/image_raw"
     front_topic: "/front/image_raw"          # unused with 3 cameras
 
     encoder_topic: "/motor_angle_feedback_topic"
