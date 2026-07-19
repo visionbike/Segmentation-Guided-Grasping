@@ -2,7 +2,7 @@
 # Model weights & converted artifacts
 # (too large for git — transfer via scp/drive)
 # ============================================
-act_yolo_grasp/models/
+src/yolo_act_grasp/resource/yolo_act_grasp/models/
 *.pt
 *.ckpt
 *.onnx
@@ -22,14 +22,6 @@ build/
 dist/
 *.venv/
 .venv/
-
-# ============================================
-# ROS 2 / colcon
-# (in case someone builds inside the repo)
-# ============================================
-install/
-log/
-.colcon/
 
 # ============================================
 # ROS 2 / colcon
