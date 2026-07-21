@@ -22,14 +22,14 @@ def generate_launch_description():
             Node(
                 package="realsense2_camera",
                 executable="realsense2_camera_node",
-                namespace=name,
-                name="realsense",
+                namespace="cameras",
+                name=name,
                 output="screen",
                 parameters=[
                     {
                         "serial_no": ParameterValue(str(cam["serial"]), value_type=str),
+                        "camera_namespace": "cameras",
                         "camera_name": name,
-                        "camera_namespace": name,
                         "enable_color": True,
                         "enable_depth": False,
                         "enable_infra1": False,

@@ -12,7 +12,7 @@ from std_msgs.msg import Float32MultiArray, Bool
 from .serial_protocol import encode_joint_command, clamp_joint_angles
 
 
-class JointCommandWriter(Node):
+class JointCommandWriterNode(Node):
     """
     Encode ACT joint commands and write them to the Teensy over serial.
 
@@ -26,7 +26,7 @@ class JointCommandWriter(Node):
     ``stop_signal_topic`` halts sending and shuts the node down.
     """
     def __init__(self):
-        super().__init__("joint_command_writer")
+        super().__init__("joint_command_writer_node")
 
         # --------------------------------------------------
         # Parameters
@@ -398,12 +398,12 @@ class JointCommandWriter(Node):
 
 
 def main(args=None):
-    logger = get_logger("joint_command_writer")
+    logger = get_logger("joint_command_writer_node")
     rclpy.init(args=args)
     node = None
 
     try:
-        node = JointCommandWriter()
+        node = JointCommandWriterNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
         logger.info("[NODE] Ctrl-C received, shutting down.")

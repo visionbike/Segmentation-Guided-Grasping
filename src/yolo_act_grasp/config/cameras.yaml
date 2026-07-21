@@ -6,8 +6,8 @@
 #   D435/D415 color stream -> rgb_camera.color_profile
 #   D405 (color from depth module) -> depth_module.color_profile
 #
-# Resulting color topic: /<name>/<name>/color/image_raw
-# (namespace = camera_name = <name>; must match obs_sync.yaml input topics)
+# Resulting color topic: /cameras/<name>/color/image_raw
+# (namespace = "cameras"; camera_name = <name>; must match obs_sync.yaml input topics)
 
 cameras:
   - name: top                     # D435

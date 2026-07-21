@@ -13,7 +13,7 @@ from std_msgs.msg import Float32MultiArray
 from .serial_protocol import Protocol, verify_checksum, compute_checksum, decode_joint_state
 
 
-class JointStateReader(Node):
+class JointStateReaderNode(Node):
     """
     Read the robot's joint state from the Teensy over serial and publish it.
 
@@ -35,7 +35,7 @@ class JointStateReader(Node):
     state for the next observation.
     """
     def __init__(self):
-        super().__init__("joint_state_reader")
+        super().__init__("joint_state_reader_node")
 
         # --------------------------------------------------
         # Parameters
@@ -333,12 +333,12 @@ class JointStateReader(Node):
 
 
 def main(args=None):
-    logger = get_logger("joint_state_reader")
+    logger = get_logger("joint_state_reader_node")
     rclpy.init(args=args)
     node = None
 
     try:
-        node = JointStateReader()
+        node = JointStateReaderNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
         logger.info("[NODE] Ctrl-C received, shutting down.")
