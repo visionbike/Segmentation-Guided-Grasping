@@ -1,0 +1,26 @@
+# RealSense camera definitions consumed by launch/cameras.launch.py
+# (custom schema, read with yaml.safe_load - NOT a ros2 params file).
+#
+# Get serials with:  rs-enumerate-devices | grep Serial
+# profile_param differs by model:
+#   D435/D415 color stream -> rgb_camera.color_profile
+#   D405 (color from depth module) -> depth_module.color_profile
+#
+# Resulting color topic: /<name>/<name>/color/image_raw
+# (namespace = camera_name = <name>; must match obs_sync.yaml input topics)
+
+cameras:
+  - name: top                     # D435
+    serial: "203522250426"
+    profile_param: rgb_camera.color_profile
+    color_profile: "640x480x15"
+
+  - name: left_wrist              # D405
+    serial: "409122274228"
+    profile_param: depth_module.color_profile
+    color_profile: "480x270x15"
+
+  - name: right_wrist             # D405
+    serial: "352122271159"
+    profile_param: depth_module.color_profile
+    color_profile: "480x270x15"
