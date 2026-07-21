@@ -1,0 +1,23 @@
+joint_command_writer:
+  ros__parameters:
+    com_port: "/dev/teensy_serial"
+    baudrate: 115200
+
+    # command write period (s); must match act_policy's `freq` (10 Hz)
+    send_interval: 0.1
+    serial_enable: true
+
+    # must match act_policy's action publisher
+    joint_command_topic: "/joint_command"
+
+    # episode handshake
+    start_signal_topic: "/episode_start"
+    stop_signal_topic: "/episode_stop"
+    record_begin_topic: "/episode_record_begin"
+    startup_delay_sec: 3.0
+
+    # per-hand gripper close threshold and debounce (frames past threshold)
+    right_gripper_threshold: 0.5
+    left_gripper_threshold: 0.5
+    right_gripper_required_count: 1
+    left_gripper_required_count: 1

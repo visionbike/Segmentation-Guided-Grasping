@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>yolo_act_grasp</name>
+    <version>0.1.0</version>
+    <description>
+        Segmentation-guided grasping: ACT imitation-learning policy driven by
+        task-conditioned YOLO segmentation masks from three RealSense cameras.
+        Intel AI PC deployment (OpenVINO FP16 on Arc GPU / NPU).
+    </description>
+    <maintainer email="phuc.visionbike@gmail.com">Felix</maintainer>
+    <license>Apache-2.0</license>
+
+    <url type="repository">https://github.com/&lt;user&gt;/segmentation-guided-grasping</url>
+
+    <!-- Core ROS runtime -->
+    <depend>rclpy</depend>
+    <depend>std_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>cv_bridge</depend>
+    <depend>message_filters</depend>
+
+    <!-- Launched by grasp_run.launch.py / cameras.launch.py, not imported -->
+    <exec_depend>realsense2_camera</exec_depend>
+    <exec_depend>ros2launch</exec_depend>
+
+    <!-- Python deps resolvable via rosdep (Ubuntu apt) -->
+    <exec_depend>python3-numpy</exec_depend>
+    <exec_depend>python3-serial</exec_depend>
+
+    <!--
+      NOT declared here (no reliable rosdep keys — installed via requirements.txt):
+      ultralytics, openvino, torch, torchvision, onnx, onnxruntime, opencv (pip)
+    -->
+
+    <test_depend>ament_flake8</test_depend>
+    <test_depend>ament_pep257</test_depend>
+    <test_depend>python3-pytest</test_depend>
+
+    <export>
+        <build_type>ament_python</build_type>
+    </export>
+</package>

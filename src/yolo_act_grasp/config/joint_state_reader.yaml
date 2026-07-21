@@ -1,0 +1,15 @@
+joint_state_reader:
+  ros__parameters:
+    com_port: "/dev/teensy_serial"
+    baudrate: 115200
+
+    # serial poll period (s); 0.1 -> 10 Hz, matching the control rate
+    poll_interval: 0.1
+    serial_enable: true
+
+    # must match obs_sync's `encoder_topic`
+    joint_state_feedback_topic: "/joint_state_feedback"
+
+    # qpos CSV logging (disabled while qpos_csv_path is empty)
+    log_qpos_to_csv: false
+    qpos_csv_path: ""
