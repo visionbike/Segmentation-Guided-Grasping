@@ -1,0 +1,28 @@
+# Parameters for obs_sync_node.py (node name: raw_observation_sync_node)
+#
+# Input topics follow the Jazzy realsense2_camera naming produced by
+# cameras.launch.py: /cames/<camera_name>/color/image_raw
+# Verify with `ros2 topic list` after the cameras are up.
+
+obs_sync_node:
+  ros__parameters:
+    # 3-camera show pipeline (drop "front")
+    camera_names: ["top", "left_wrist", "right_wrist"]
+
+    camera_top_topic: "/cameras/top/color/image_raw"
+    camera_left_topic: "/cameras/left_wrist/color/image_raw"
+    camera_right_topic: "/cameras/right_wrist/color/image_raw"
+    camera_front_topic: "/cameras/front/color/image_raw"          # unused with 3 cameras
+
+    encoder_topic: "/joint_state_feedback"
+
+    sync_top_topic: "/sync/top/image_raw"
+    sync_left_topic: "/sync/left_wrist/image_raw"
+    sync_right_topic: "/sync/right_wrist/image_raw"
+    sync_front_topic: "/sync/front/image_raw"  # unused with 3 cameras
+    sync_qpos_topic: "/sync/qpos"
+
+    encoder_timeout: 0.2
+    image_slop: 0.1   # ~1.5 frame periods at 15 fps
+    queue_size: 20
+    print_timing_log: true
