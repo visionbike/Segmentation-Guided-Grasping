@@ -1,0 +1,25 @@
+# Datasets — regenerate with convert_coco.py, create_data_config.py, resplit_by_clip.py
+coco_json/
+dataset_*/
+
+# Pretrained checkpoints — ultralytics re-downloads these on demand
+pretrained_models/
+*.pt
+*.onnx
+*.engine
+*.torchscript
+
+# Training output
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
